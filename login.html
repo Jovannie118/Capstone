@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin sign in - Paracale Scholarships</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;600;800&display=swap">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<main>
+  <div class="panel center-card">
+    <h1 style="font-size:1.35rem">Administrator sign in</h1>
+    <p class="muted small">Staff access to the dashboard, applications, verification, approvals and reports.</p>
+
+    <div id="alert" class="hidden"></div>
+
+    <form id="loginForm" class="stack" novalidate>
+      <div class="field">
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" value="admin@paracale.edu" autocomplete="username">
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" value="paracale2026" autocomplete="current-password">
+      </div>
+      <button class="btn btn-primary" type="submit" id="submitBtn" style="width:100%">Sign in</button>
+    </form>
+
+    <p class="muted small" style="margin-top:1rem">Demo credentials: <strong>admin@paracale.edu</strong> / <strong>paracale2026</strong></p>
+  </div>
+</main>
+
+<script src="assets/js/app.js"></script>
+<script>
+initShell({ active: 'login.html' }).then((session) => {
+  if (session && session.signedIn) location.href = 'dashboard.html';
+});
+footer();
+
+const alertBox = document.getElementById('alert');
+function showError(msg) {
+  alertBox.className = 'alert alert-error';
+  alertBox.textContent = msg;
+}
+
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  try {
+    await apiPost('auth.php?action=login', {
+      email: document.getElementById('email').value,
+      password: document.getElementById('password').value,
+    });
+    location.href = 'dashboard.html';
+  } catch (err) {
+    showError(err.message);
+    btn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>

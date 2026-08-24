@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paracale Scholarship Management System</title>
+<meta name="description" content="Apply for a Paracale municipal scholarship, upload your four required documents and track your approval status online.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;600;800&display=swap">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<main>
+  <section class="hero">
+    <span class="eyebrow">Municipality of Paracale</span>
+    <h1>Scholarship applications, verified and ranked in one place</h1>
+    <p>Submit your registration form, signed school ID, barangay indigency and certificate of grade once. The scholarship office verifies each document, ranks applicants fairly, and publishes the decision to your own status page.</p>
+    <div class="hero-actions">
+      <a class="btn btn-gold" href="apply.html">Apply for a scholarship</a>
+      <a class="btn btn-outline-light" href="status.html">Check my application</a>
+    </div>
+  </section>
+
+  <div class="grid cols-4" id="stats"></div>
+
+  <div class="panel">
+    <div class="panel-head"><h2>How it works</h2></div>
+    <ol class="steps">
+      <li><span class="n">1</span><div><strong>Apply online</strong><p class="muted small">Give your full name, email, address and school, then attach the four required documents.</p></div></li>
+      <li><span class="n">2</span><div><strong>Document verification</strong><p class="muted small">A verification officer checks every file and asks for a re-upload when a scan is unreadable.</p></div></li>
+      <li><span class="n">3</span><div><strong>Ranking</strong><p class="muted small">A weighted score combines academics, financial need, activities and the essay.</p></div></li>
+      <li><span class="n">4</span><div><strong>Decision</strong><p class="muted small">The committee approves, waitlists or declines. You see the result on your status page.</p></div></li>
+    </ol>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h2>Required documents</h2></div>
+    <div class="grid cols-2" id="docs"></div>
+  </div>
+</main>
+
+<script src="assets/js/app.js"></script>
+<script>
+initShell({ active: 'index.html' });
+footer();
+
+document.getElementById('docs').innerHTML = DOC_TYPES
+  .map((d, i) => '<div class="stat"><div class="label">Document ' + (i + 1) + '</div><div style="font-weight:700">' + esc(d) + '</div></div>')
+  .join('');
+
+document.getElementById('stats').innerHTML = [
+  ['Application window', 'Open', 'Cycle 2026'],
+  ['Required documents', '4', 'PDF, JPG or PNG'],
+  ['Award range', '\u20B12,800 - \u20B15,000', 'Per semester'],
+  ['Decision time', '2 weeks', 'After verification'],
+].map(([l, v, h]) => '<div class="stat"><div class="label">' + l + '</div><div class="value">' + v + '</div><div class="hint">' + h + '</div></div>').join('');
+</script>
+</body>
+</html>

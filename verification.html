@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verification - Paracale Scholarships</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;600;800&display=swap">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<main>
+  <div class="page-header">
+    <h1>Document verification</h1>
+    <p>Check each uploaded file and mark it verified or rejected. Applications move to Ranked once all four documents pass.</p>
+  </div>
+  <div id="alert" class="hidden"></div>
+  <div id="body"></div>
+</main>
+
+<script src="assets/js/app.js"></script>
+<script>
+footer();
+const alertBox = document.getElementById('alert');
+
+function note(msg, kind) {
+  alertBox.className = 'alert alert-' + (kind || 'success');
+  alertBox.textContent = msg;
+}
+
+function card(a) {
+  const docs = a.documents.map((d) => (
+    '<tr><td>' + esc(d.doc_type) + '</td><td class="muted small">' + esc(d.file_name) + '</td>' +
+    '<td>' + statusBadge(d.status) + (d.note ? '<div class="muted small">' + esc(d.note) + '</div>' : '') + '</td>' +
+    '<td class="row">' +
+      '<button class="btn btn-success btn-sm" data-doc="' + d.id + '" data-status="verified">Verify</button>' +
+      '<button class="btn btn-danger btn-sm" data-doc="' + d.id + '" data-status="rejected">Reject</button>' +
+      '<button class="btn btn-outline btn-sm" data-doc="' + d.id + '" data-status="pending">Reset</button>' +
+    '</td></tr>'
+  )).join('');
+
+  return '<div class="panel"><div class="spread">' +
+      '<div><h2>' + esc(a.full_name) + '</h2><p class="muted small">' + esc(a.ref_code) + ' - ' + esc(a.school) + '</p></div>' +
+      statusBadge(a.status, a.status_label) +
+    '</div><div class="table-wrap"><table><thead><tr><th>Document</th><th>File</th><th>Status</th><th>Action</th></tr></thead>' +
+    '<tbody>' + docs + '</tbody></table></div></div>';
+}
+
+async function load() {
+  const body = document.getElementById('body');
+  try {
+    const data = await apiGet('applications.php');
+    const queue = data.applications.filter((a) => a.documents.some((d) => d.status !== 'verified'));
+    body.innerHTML = queue.length
+      ? queue.map(card).join('')
+      : '<div class="panel"><h2>Queue is clear</h2><p class="muted small">Every document in this cycle has been verified.</p></div>';
+
+    body.querySelectorAll('button[data-doc]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        try {
+          await apiPost('verify.php', { doc_id: Number(btn.dataset.doc), status: btn.dataset.status });
+          note('Document marked ' + btn.dataset.status + '.');
+          load();
+        } catch (err) {
+          note(err.message, 'error');
+          btn.disabled = false;
+        }
+      });
+    });
+  } catch (err) {
+    body.innerHTML = '<div class="alert alert-error">' + esc(err.message) + '</div>';
+  }
+}
+
+initShell({ active: 'verification.html', admin: true }).then((s) => { if (s) load(); });
+</script>
+</body>
+</html>
