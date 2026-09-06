@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Apply - Paracale Scholarships</title>
+<meta name="description" content="Submit your Paracale scholarship application with the four required documents.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;600;800&display=swap">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<main>
+  <div class="page-header">
+    <h1>Scholarship application</h1>
+    <p>Fill in your details and attach all four required documents. Accepted formats: PDF, JPG or PNG, up to 8 MB each.</p>
+  </div>
+
+  <div id="alert" class="hidden"></div>
+
+  <div class="panel" id="formPanel">
+    <form id="applyForm" novalidate>
+      <div class="grid cols-2">
+        <div class="field">
+          <label for="full_name">Full name</label>
+          <input type="text" id="full_name" name="full_name">
+          <p class="error hidden" data-error="full_name"></p>
+        </div>
+        <div class="field">
+          <label for="email">Email address</label>
+          <input type="email" id="email" name="email">
+          <p class="error hidden" data-error="email"></p>
+        </div>
+        <div class="field">
+          <label for="phone">Mobile number</label>
+          <input type="tel" id="phone" name="phone" placeholder="0912 345 6789">
+          <p class="error hidden" data-error="phone"></p>
+        </div>
+        <div class="field">
+          <label for="address">Address</label>
+          <input type="text" id="address" name="address" placeholder="House no., street, barangay, Paracale">
+          <p class="error hidden" data-error="address"></p>
+        </div>
+        <div class="field">
+          <label for="school">School</label>
+          <input type="text" id="school" name="school" placeholder="Name of your school or college">
+          <p class="error hidden" data-error="school"></p>
+        </div>
+      </div>
+
+      <h3 style="margin-top:.5rem">Upload documents</h3>
+      <div class="grid cols-2" id="docFields"></div>
+
+      <div class="row" style="margin-top:1rem">
+        <button class="btn btn-primary" type="submit" id="submitBtn">Submit application</button>
+        <a class="btn btn-outline" href="index.html">Cancel</a>
+      </div>
+    </form>
+  </div>
+</main>
+
+<script src="assets/js/app.js"></script>
+<script>
+initShell({ active: 'apply.html' });
+footer();
+
+document.getElementById('docFields').innerHTML = DOC_TYPES.map((type, i) => (
+  '<div class="field">' +
+    '<label for="doc_' + i + '">' + esc(type) + '</label>' +
+    '<input type="file" id="doc_' + i + '" name="doc_' + i + '" accept=".pdf,.jpg,.jpeg,.png">' +
+    '<p class="error hidden" data-error="doc_' + i + '"></p>' +
+  '</div>'
+)).join('');
+
+const alertBox = document.getElementById('alert');
+
+function clearErrors() {
+  document.querySelectorAll('[data-error]').forEach((el) => { el.textContent = ''; el.classList.add('hidden'); });
+  alertBox.className = 'hidden';
+}
+
+function showErrors(errors) {
+  Object.entries(errors).forEach(([key, msg]) => {
+    const el = document.querySelector('[data-error="' + key + '"]');
+    if (el) { el.textContent = msg; el.classList.remove('hidden'); }
+  });
+  alertBox.className = 'alert alert-error';
+  alertBox.textContent = 'Please correct the highlighted fields.';
+}
+
+document.getElementById('applyForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  clearErrors();
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+
+  const fd = new FormData(e.target);
+  const { ok, data } = await apiUpload('apply.php', fd);
+
+  if (ok && data.ok) {
+    document.getElementById('formPanel').innerHTML =
+      '<h2>Application received</h2>' +
+      '<p>Keep this reference code - you will need it to check your status.</p>' +
+      '<p class="value display" style="font-size:1.8rem">' + esc(data.ref_code) + '</p>' +
+      '<div class="row"><a class="btn btn-primary" href="status.html?q=' + encodeURIComponent(data.ref_code) + '">Track my application</a>' +
+      '<a class="btn btn-outline" href="index.html">Back to home</a></div>';
+    alertBox.className = 'alert alert-success';
+    alertBox.textContent = 'Submitted successfully.';
+    window.scrollTo({ top: 0 });
+    return;
+  }
+
+  if (data.errors) showErrors(data.errors);
+  else {
+    alertBox.className = 'alert alert-error';
+    alertBox.textContent = data.error || 'Could not submit your application.';
+  }
+  btn.disabled = false;
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Notifications - Paracale Scholarships</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;600;800&display=swap">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<main>
+  <div class="page-header">
+    <h1>Notifications</h1>
+    <p>Every submission, verification and decision recorded by the system.</p>
+  </div>
+  <div id="body"></div>
+</main>
+
+<script src="assets/js/app.js"></script>
+<script>
+footer();
+
+const KIND = { success: 'alert-success', warning: 'alert-error', info: 'alert-info' };
+
+async function load() {
+  const body = document.getElementById('body');
+  try {
+    const { notifications } = await apiGet('notifications.php');
+    const unread = notifications.filter((n) => Number(n.is_read) === 0).length;
+
+    const items = notifications.map((n) => (
+      '<div class="panel" style="margin-bottom:.75rem"><div class="spread">' +
+        '<div><strong>' + esc(n.title) + '</strong>' +
+        '<p class="muted small" style="margin:.2rem 0 0">' + esc(n.body) + '</p></div>' +
+        '<div style="text-align:right"><span class="badge ' + (n.kind === 'success' ? 'badge-approved' : n.kind === 'warning' ? 'badge-rejected' : 'badge-submitted') + '">' + esc(n.kind) + '</span>' +
+        '<div class="muted small">' + fmtDate(n.created_at) + '</div></div>' +
+      '</div></div>'
+    )).join('') || '<div class="panel muted">No notifications yet.</div>';
+
+    body.innerHTML =
+      '<div class="panel"><div class="spread"><span class="muted small">' + notifications.length + ' entries - ' + unread + ' unread</span>' +
+      '<button class="btn btn-outline btn-sm" id="readAll">Mark all as read</button></div></div>' + items;
+
+    const btn = document.getElementById('readAll');
+    if (btn) btn.addEventListener('click', async () => { await apiPost('notifications.php?action=read-all'); load(); });
+  } catch (err) {
+    body.innerHTML = '<div class="alert alert-error">' + esc(err.message) + '</div>';
+  }
+}
+
+initShell({ active: 'notifications.html', admin: true }).then((s) => { if (s) load(); });
+</script>
+</body>
+</html>

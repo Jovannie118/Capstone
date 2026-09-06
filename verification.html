@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verification - Paracale Scholarships</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;600;800&display=swap">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<main>
+  <div class="page-header">
+    <h1>Document verification</h1>
+    <p>Click View to preview each uploaded file.</p>
+  </div>
+  <div id="alert" class="hidden"></div>
+  <div id="body"></div>
+</main>
+
+<script src="assets/js/app.js"></script>
+<script>
+footer();
+const alertBox = document.getElementById('alert');
+
+function note(msg, kind) {
+  alertBox.className = 'alert alert-' + (kind || 'success');
+  alertBox.textContent = msg;
+}
+
+function card(a) {
+  const docs = a.documents.map((d) => (
+    '<tr><td class="row">' + esc(d.doc_type) +
+      '<button class="btn btn-outline btn-sm" data-view="' + d.id + '">View</button>' +
+    '</td><td class="muted small">' + esc(d.file_name) + '</td>' +
+    '<td>' + statusBadge(d.status) + (d.note ? '<div class="muted small">' + esc(d.note) + '</div>' : '') + '</td>' +
+    '</tr>'
+  )).join('');
+
+  const decided = a.status === 'approved' || a.status === 'rejected';
+
+  return '<div class="panel"><div class="spread">' +
+      '<div><h2>' + esc(a.full_name) + '</h2><p class="muted small">' + esc(a.ref_code) + ' - ' + esc(a.school) + '</p></div>' +
+      '<div class="row">' +
+        statusBadge(a.status, a.status_label) +
+        '<button class="btn btn-success btn-sm" data-app="' + a.id + '" data-status="approved"' + (decided ? ' disabled' : '') + '>Approve</button>' +
+        '<button class="btn btn-danger btn-sm" data-app="' + a.id + '" data-status="rejected"' + (decided ? ' disabled' : '') + '>Reject</button>' +
+      '</div>' +
+    '</div><div class="table-wrap"><table><thead><tr><th>Document</th><th>File</th><th>Status</th></tr></thead>' +
+    '<tbody>' + docs + '</tbody></table></div></div>';
+}
+
+async function load() {
+  const body = document.getElementById('body');
+  try {
+    const data = await apiGet('applications.php');
+    const queue = data.applications.filter((a) => a.documents.some((d) => d.status !== 'verified'));
+    body.innerHTML = queue.length
+      ? queue.map(card).join('')
+      : '<div class="panel"><h2>Queue is clear</h2><p class="muted small">Every document in this cycle has been verified.</p></div>';
+
+    const docsById = {};
+    queue.forEach((a) => a.documents.forEach((d) => { docsById[d.id] = d; }));
+
+    body.querySelectorAll('button[data-view]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const doc = docsById[Number(btn.dataset.view)];
+        if (doc) openDocModal(doc);
+      });
+    });
+
+    body.querySelectorAll('button[data-app]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        try {
+          await apiPost('decision.php', { app_id: Number(btn.dataset.app), status: btn.dataset.status });
+          note('Decision recorded: ' + btn.dataset.status + '.');
+          load();
+        } catch (err) {
+          note(err.message, 'error');
+          btn.disabled = false;
+        }
+      });
+    });
+  } catch (err) {
+    body.innerHTML = '<div class="alert alert-error">' + esc(err.message) + '</div>';
+  }
+}
+
+initShell({ active: 'verification.html', admin: true }).then((s) => { if (s) load(); });
+</script>
+</body>
+</html>

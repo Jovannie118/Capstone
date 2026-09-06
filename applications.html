@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Applications - Paracale Scholarships</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;600;800&display=swap">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<main>
+  <div class="page-header">
+    <h1>Applications</h1>
+    <p>Search the applicant register, open a record and review its documents, score and timeline.</p>
+  </div>
+  <div id="body"></div>
+</main>
+
+<script src="assets/js/app.js"></script>
+<script>
+footer();
+
+let APPS = [];
+
+function detail(app) {
+  const docs = app.documents.map((d) => (
+    '<tr><td>' + esc(d.doc_type) + '</td><td>' + esc(d.file_name) + '</td><td>' + statusBadge(d.status) + '</td>' +
+    '<td class="muted small">' + esc(d.note || '') + '</td></tr>'
+  )).join('');
+  const tl = app.timeline.map((t) => (
+    '<li><strong>' + esc(t.label) + '</strong><div class="muted small">' + esc(t.actor) + ' - ' + fmtDate(t.created_at) + '</div></li>'
+  )).join('');
+
+  return '<div class="panel"><div class="spread"><div>' +
+      '<h2>' + esc(app.full_name) + '</h2>' +
+      '<p class="muted small">' + esc(app.ref_code) + ' - ' + esc(app.school) + '</p>' +
+      '<p class="muted small">' + esc(app.email) + ' - ' + esc(app.phone || 'No mobile number') + '</p>' +
+      '<p class="muted small">' + esc(app.address) + '</p>' +
+    '</div><div style="text-align:right">' + statusBadge(app.status, app.status_label) +
+      '<div class="value display" style="font-size:1.6rem">' + app.score + '</div>' +
+      '<div class="muted small">Composite score</div>' +
+    '</div></div>' +
+    '<div class="row" style="margin-top:.75rem"><a class="btn btn-outline btn-sm" href="applications.html">Back to list</a>' +
+    '<a class="btn btn-outline btn-sm" href="verification.html">Verify documents</a>' +
+    '<a class="btn btn-outline btn-sm" href="approvals.html">Record a decision</a></div></div>' +
+    '<div class="grid cols-2">' +
+      '<div class="panel"><div class="panel-head"><h2>Documents</h2></div><div class="table-wrap"><table>' +
+        '<thead><tr><th>Document</th><th>File</th><th>Status</th><th>Note</th></tr></thead><tbody>' + docs + '</tbody></table></div></div>' +
+      '<div class="panel"><div class="panel-head"><h2>Timeline</h2></div><ul class="timeline">' + (tl || '<li class="muted small">No activity.</li>') + '</ul></div>' +
+    '</div>';
+}
+
+function list() {
+  const q = (document.getElementById('search') || {}).value || '';
+  const status = (document.getElementById('filter') || {}).value || 'all';
+  const term = q.trim().toLowerCase();
+
+  const rows = APPS.filter((a) => (status === 'all' || a.status === status) &&
+      (!term || (a.full_name + a.email + (a.phone || '') + a.ref_code + a.school).toLowerCase().includes(term)))
+    .map((a) => (
+      '<tr><td><a href="applications.html?ref=' + encodeURIComponent(a.ref_code) + '">' + esc(a.full_name) + '</a>' +
+      '<div class="muted small">' + esc(a.email) + '</div>' +
+      '<div class="muted small">' + esc(a.phone || '') + '</div></td>' +
+      '<td>' + esc(a.ref_code) + '</td><td>' + esc(a.school) + '</td>' +
+      '<td>' + statusBadge(a.status, a.status_label) + '</td>' +
+      '<td class="num">' + a.score + '</td>' +
+      '<td class="num">' + a.documents.filter((d) => d.status === 'verified').length + '/' + a.documents.length + '</td>' +
+      '<td class="muted small">' + fmtDate(a.submitted_at) + '</td></tr>'
+    )).join('') || '<tr><td colspan="7" class="muted">No applications match your search.</td></tr>';
+
+  document.getElementById('rows').innerHTML = rows;
+}
+
+initShell({ active: 'applications.html', admin: true }).then(async (session) => {
+  if (!session) return;
+  const body = document.getElementById('body');
+  const ref = new URLSearchParams(location.search).get('ref');
+
+  try {
+    if (ref) {
+      const data = await apiGet('applications.php?ref=' + encodeURIComponent(ref));
+      body.innerHTML = detail(data.application);
+      return;
+    }
+
+    const data = await apiGet('applications.php');
+    APPS = data.applications;
+    body.innerHTML =
+      '<div class="panel"><div class="row">' +
+        '<input type="text" id="search" placeholder="Search name, email, reference or school" style="flex:1 1 240px">' +
+        '<select id="filter" style="max-width:220px">' +
+          '<option value="all">All statuses</option><option value="submitted">Submitted</option>' +
+          '<option value="under_verification">Verification</option><option value="ranked">Ranked</option>' +
+          '<option value="approved">Approved</option><option value="waitlisted">Waitlisted</option>' +
+          '<option value="rejected">Rejected</option>' +
+        '</select></div></div>' +
+      '<div class="panel"><div class="table-wrap"><table><thead><tr>' +
+        '<th>Applicant</th><th>Reference</th><th>School</th><th>Status</th><th class="num">Score</th><th class="num">Docs</th><th>Submitted</th>' +
+        '</tr></thead><tbody id="rows"></tbody></table></div></div>';
+
+    document.getElementById('search').addEventListener('input', list);
+    document.getElementById('filter').addEventListener('change', list);
+    list();
+  } catch (err) {
+    body.innerHTML = '<div class="alert alert-error">' + esc(err.message) + '</div>';
+  }
+});
+</script>
+</body>
+</html>

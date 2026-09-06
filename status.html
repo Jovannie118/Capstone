@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My application - Paracale Scholarships</title>
+<meta name="description" content="Look up your Paracale scholarship application by reference code or email to see whether you were approved.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;600;800&display=swap">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<main>
+  <div class="page-header">
+    <h1>My application</h1>
+    <p>Enter your application ID (for example SCH-2026-1001) or the email you applied with.</p>
+  </div>
+
+  <div class="panel">
+    <form id="lookupForm" class="row">
+      <input type="text" id="q" placeholder="SCH-2026-1001 or your email" style="flex:1 1 260px">
+      <button class="btn btn-primary" type="submit">Check status</button>
+    </form>
+  </div>
+
+  <div id="result"></div>
+</main>
+
+<script src="assets/js/app.js"></script>
+<script>
+initShell({ active: 'status.html' });
+footer();
+
+const result = document.getElementById('result');
+
+function decisionCard(app) {
+  const map = {
+    approved: ['alert-success', 'Congratulations - your scholarship was approved.'],
+    rejected: ['alert-error', 'Your application was not successful this cycle.'],
+    waitlisted: ['alert-info', 'You are on the waitlist. We will contact you if funds free up.'],
+  };
+  const tone = map[app.status] || ['alert-info', 'Your application is still being processed.'];
+  return '<div class="alert ' + tone[0] + '"><strong>' + esc(app.status_label) + '.</strong> ' + tone[1] + '</div>';
+}
+
+function render(app) {
+  const docs = app.documents.map((d) => (
+    '<tr><td>' + esc(d.doc_type) + '</td><td>' + esc(d.file_name) + '</td>' +
+    '<td>' + statusBadge(d.status) + '</td><td class="muted small">' + esc(d.note || '') + '</td></tr>'
+  )).join('');
+
+  const tl = app.timeline.map((t) => (
+    '<li><strong>' + esc(t.label) + '</strong><div class="muted small">' + esc(t.actor) + ' - ' + fmtDate(t.created_at) + '</div></li>'
+  )).join('');
+
+  result.innerHTML =
+    decisionCard(app) +
+    '<div class="panel"><div class="spread"><div>' +
+      '<h2>' + esc(app.full_name) + '</h2>' +
+      '<p class="muted small">' + esc(app.ref_code) + ' - ' + esc(app.school) + '</p>' +
+      '<p class="muted small">' + esc(app.email) + ' - ' + esc(app.phone || 'No mobile number') + '</p>' +
+      '<p class="muted small">' + esc(app.address) + '</p>' +
+    '</div><div>' + statusBadge(app.status, app.status_label) +
+      '<div class="muted small">Submitted ' + fmtDate(app.submitted_at) + '</div>' +
+    '</div></div></div>' +
+    '<div class="grid cols-2">' +
+      '<div class="panel"><div class="panel-head"><h2>My documents</h2></div>' +
+        '<div class="table-wrap"><table><thead><tr><th>Document</th><th>File</th><th>Status</th><th>Note</th></tr></thead><tbody>' + docs + '</tbody></table></div></div>' +
+      '<div class="panel"><div class="panel-head"><h2>Progress history</h2></div><ul class="timeline">' + (tl || '<li class="muted small">No activity yet.</li>') + '</ul></div>' +
+    '</div>';
+}
+
+async function lookup(q) {
+  result.innerHTML = '<div class="panel muted">Looking up ' + esc(q) + '...</div>';
+  try {
+    const data = await apiGet('status.php?q=' + encodeURIComponent(q));
+    render(data.application);
+  } catch (err) {
+    result.innerHTML = '<div class="alert alert-error">' + esc(err.message) + '</div>';
+  }
+}
+
+document.getElementById('lookupForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const q = document.getElementById('q').value.trim();
+  if (q) lookup(q);
+});
+
+const preset = new URLSearchParams(location.search).get('q');
+if (preset) { document.getElementById('q').value = preset; lookup(preset); }
+</script>
+</body>
+</html>

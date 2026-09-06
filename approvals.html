@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Approvals - Paracale Scholarships</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;600;800&display=swap">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<main>
+  <div class="page-header">
+    <h1>Approvals</h1>
+    <p>Award scholarships against the cycle budget. Applicants are listed by composite score.</p>
+  </div>
+  <div id="alert" class="hidden"></div>
+  <div id="body"></div>
+</main>
+
+<script src="assets/js/app.js"></script>
+<script>
+footer();
+const alertBox = document.getElementById('alert');
+function note(msg, kind) { alertBox.className = 'alert alert-' + (kind || 'success'); alertBox.textContent = msg; }
+
+async function load() {
+  const body = document.getElementById('body');
+  try {
+    const { applications, budget } = await apiGet('applications.php');
+    const committed = applications.filter((a) => a.status === 'approved').reduce((s, a) => s + Number(a.requested), 0);
+    const remaining = Math.max(0, budget - committed);
+    const ranked = [...applications].sort((a, b) => b.score - a.score);
+
+    const rows = ranked.map((a, i) => {
+      const allVerified = a.documents.every((d) => d.status === 'verified');
+      return '<tr><td class="num">' + (i + 1) + '</td>' +
+        '<td><a href="applications.html?ref=' + encodeURIComponent(a.ref_code) + '">' + esc(a.full_name) + '</a>' +
+        '<div class="muted small">' + esc(a.ref_code) + ' - ' + esc(a.school) + '</div></td>' +
+        '<td class="muted small">' + esc(a.phone || '-') + '</td>' +
+        '<td class="num">' + a.score + '</td>' +
+        '<td class="num">' + peso(a.requested) + '</td>' +
+        '<td>' + statusBadge(a.status, a.status_label) +
+          (allVerified ? '' : '<div class="muted small">Documents incomplete</div>') + '</td>' +
+        '<td class="row">' +
+          '<button class="btn btn-success btn-sm" data-app="' + a.id + '" data-status="approved"' + (allVerified ? '' : ' disabled') + '>Approve</button>' +
+          '<button class="btn btn-outline btn-sm" data-app="' + a.id + '" data-status="waitlisted">Waitlist</button>' +
+          '<button class="btn btn-danger btn-sm" data-app="' + a.id + '" data-status="rejected">Decline</button>' +
+        '</td></tr>';
+    }).join('');
+
+    const pct = budget ? Math.min(100, Math.round((committed / budget) * 100)) : 0;
+
+    body.innerHTML =
+      '<div class="grid cols-3">' +
+        '<div class="stat"><div class="label">Cycle budget</div><div class="value">' + peso(budget) + '</div></div>' +
+        '<div class="stat"><div class="label">Committed</div><div class="value">' + peso(committed) + '</div><div class="hint">' + pct + '% used</div></div>' +
+        '<div class="stat"><div class="label">Remaining</div><div class="value">' + peso(remaining) + '</div></div>' +
+      '</div>' +
+      '<div class="panel"><div class="bar"><span style="width:' + pct + '%"></span></div></div>' +
+      '<div class="panel"><div class="panel-head"><h2>Decision queue</h2></div><div class="table-wrap"><table><thead><tr>' +
+        '<th>#</th><th>Applicant</th><th>Mobile</th><th class="num">Score</th><th class="num">Requested</th><th>Status</th><th>Decision</th>' +
+        '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+
+    body.querySelectorAll('button[data-app]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        try {
+          await apiPost('decision.php', { app_id: Number(btn.dataset.app), status: btn.dataset.status });
+          note('Decision recorded: ' + btn.dataset.status + '.');
+          load();
+        } catch (err) { note(err.message, 'error'); btn.disabled = false; }
+      });
+    });
+  } catch (err) {
+    body.innerHTML = '<div class="alert alert-error">' + esc(err.message) + '</div>';
+  }
+}
+
+initShell({ active: 'approvals.html', admin: true }).then((s) => { if (s) load(); });
+</script>
+</body>
+</html>

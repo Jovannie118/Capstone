@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reports - Paracale Scholarships</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;600;800&display=swap">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<main>
+  <div class="page-header">
+    <h1>Cycle reports</h1>
+    <p>Status mix, awards by school and a downloadable CSV of every application.</p>
+  </div>
+  <div id="body"></div>
+</main>
+
+<script src="assets/js/app.js"></script>
+<script>
+footer();
+
+initShell({ active: 'reports.html', admin: true }).then(async (session) => {
+  if (!session) return;
+  const body = document.getElementById('body');
+  try {
+    const r = await apiGet('reports.php');
+    const stats = [
+      ['Applications', r.total, 'Cycle 2026'],
+      ['Budget', peso(r.budget), 'Approved total ' + peso(r.committed)],
+      ['Remaining', peso(Math.max(0, r.budget - r.committed)), 'Uncommitted funds'],
+      ['Documents pending', r.docsPending, 'Awaiting verification'],
+    ].map(([l, v, h]) => '<div class="stat"><div class="label">' + l + '</div><div class="value">' + v + '</div><div class="hint">' + h + '</div></div>').join('');
+
+    const maxStatus = Math.max(1, ...Object.values(r.byStatus));
+    const statusRows = Object.entries(r.byStatus).map(([label, n]) => (
+      '<div style="margin-bottom:.6rem"><div class="spread small"><span>' + esc(label) + '</span><strong>' + n + '</strong></div>' +
+      '<div class="bar"><span style="width:' + Math.round((n / maxStatus) * 100) + '%"></span></div></div>'
+    )).join('');
+
+    const schoolRows = Object.entries(r.bySchool).map(([school, n]) => (
+      '<tr><td>' + esc(school) + '</td><td class="num">' + n + '</td></tr>'
+    )).join('');
+
+    const appRows = r.applications.map((a) => (
+      '<tr><td>' + esc(a.ref_code) + '</td><td>' + esc(a.full_name) + '</td><td>' + esc(a.phone || '-') + '</td><td>' + esc(a.school) + '</td>' +
+      '<td>' + statusBadge(a.status, a.status_label) + '</td><td class="num">' + a.score + '</td>' +
+      '<td class="num">' + peso(a.requested) + '</td></tr>'
+    )).join('');
+
+    body.innerHTML =
+      '<div class="grid cols-4">' + stats + '</div>' +
+      '<div class="grid cols-2">' +
+        '<div class="panel"><div class="panel-head"><h2>By status</h2></div>' + statusRows + '</div>' +
+        '<div class="panel"><div class="panel-head"><h2>By school</h2></div><div class="table-wrap"><table>' +
+          '<thead><tr><th>School</th><th class="num">Applicants</th></tr></thead><tbody>' + schoolRows + '</tbody></table></div></div>' +
+      '</div>' +
+      '<div class="panel"><div class="panel-head"><h2>All applications</h2>' +
+        '<a class="btn btn-gold btn-sm" href="api/reports.php?export=csv">Export CSV</a></div>' +
+        '<div class="table-wrap"><table><thead><tr><th>Reference</th><th>Name</th><th>Mobile</th><th>School</th><th>Status</th>' +
+        '<th class="num">Score</th><th class="num">Requested</th></tr></thead><tbody>' + appRows + '</tbody></table></div></div>';
+  } catch (err) {
+    body.innerHTML = '<div class="alert alert-error">' + esc(err.message) + '</div>';
+  }
+});
+</script>
+</body>
+</html>
