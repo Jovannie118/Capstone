@@ -2,8 +2,9 @@
 /**
  * Document verification (admin only).
  *   POST { doc_id, status: pending|verified|rejected, note? }
- * Re-derives the application status: all verified -> ranked, otherwise -> under_verification.
- * Approved / rejected applications keep their final decision.
+ * Updates only the individual document's status (+ optional rejection note).
+ * The application status is NOT changed here - decisions are made on the
+ * approvals page via decision.php.
  */
 require __DIR__ . '/config.php';
 require_admin();
@@ -35,17 +36,17 @@ $pdo->prepare('UPDATE documents SET status = ?, note = ? WHERE id = ?')
     ->execute([$status, $status === 'rejected' ? $note : null, $docId]);
 
 $appId = (int) $doc['application_id'];
+$actor = current_admin()['name'] ?? 'Verification Officer';
 
-$counts = $pdo->prepare('SELECT SUM(status <> "verified") AS unverified FROM documents WHERE application_id = ?');
-$counts->execute([$appId]);
-$unverified = (int) $counts->fetchColumn();
-
-if (!in_array($doc['app_status'], ['approved', 'rejected'], true)) {
-    $newStatus = $unverified === 0 ? 'ranked' : 'under_verification';
-    $pdo->prepare('UPDATE applications SET status = ? WHERE id = ?')->execute([$newStatus, $appId]);
-}
-
-add_timeline($appId, 'Document ' . $doc['doc_type'] . ' marked ' . $status, 'Verification Officer');
+add_timeline($appId, 'Document ' . $doc['doc_type'] . ' marked ' . $status . ($status === 'rejected' && $note !== '' ? ' - ' . $note : ''), $actor);
+add_audit(
+    'doc_' . $status,
+    $appId,
+    $docId,
+    $doc['status'],
+    $status,
+    $status === 'rejected' ? $note : null
+);
 add_notification(
     'Document ' . $status,
     $doc['ref_code'] . ': ' . $doc['doc_type'] . ' was marked ' . $status . '.',

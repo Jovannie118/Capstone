@@ -73,6 +73,17 @@ function require_admin(): void
     }
 }
 
+/** Reads a value from the settings table (falls back to $fallback). */
+function setting(string $key, string $fallback = ''): string
+{
+    static $cache = null;
+    if ($cache === null) {
+        $cache = (array) db()->query('SELECT skey, svalue FROM settings')->fetchAll();
+        $cache = array_column($cache, 'svalue', 'skey');
+    }
+    return (string) ($cache[$key] ?? $fallback);
+}
+
 /**
  * Weighted composite score.
  * Academics 45%, financial need 30%, activities 15%, essay 10%,
@@ -106,6 +117,48 @@ function add_timeline(int $appId, string $label, string $actor): void
 {
     $stmt = db()->prepare('INSERT INTO timeline (application_id, label, actor) VALUES (?, ?, ?)');
     $stmt->execute([$appId, $label, $actor]);
+}
+
+/** Returns the signed-in admin (id, email, name), or null. */
+function current_admin(): ?array
+{
+    if (empty($_SESSION['admin_id'])) {
+        return null;
+    }
+    return [
+        'id'    => (int) $_SESSION['admin_id'],
+        'email' => $_SESSION['admin_email'] ?? null,
+        'name'  => $_SESSION['admin_name'] ?? null,
+    ];
+}
+
+/**
+ * Appends a structured record to the audit log.
+ * At least the signed-in admin is recorded when available.
+ */
+function add_audit(
+    string $action,
+    int $appId = 0,
+    ?int $docId = null,
+    ?string $prevStatus = null,
+    ?string $newStatus = null,
+    ?string $remarks = null
+): void {
+    $admin = current_admin();
+    $stmt = db()->prepare(
+        'INSERT INTO audit_log (admin_id, admin_email, action, application_id, document_id, previous_status, new_status, remarks)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    );
+    $stmt->execute([
+        $admin['id'] ?? null,
+        $admin['email'] ?? null,
+        $action,
+        $appId ?: null,
+        $docId,
+        $prevStatus,
+        $newStatus,
+        $remarks !== null ? mb_substr($remarks, 0, 500) : null,
+    ]);
 }
 
 /**
@@ -159,7 +212,7 @@ function load_application(int $id): ?array
 
 function hydrate(array $app): array
 {
-    $docs = db()->prepare('SELECT id, doc_type, file_name, status, note FROM documents WHERE application_id = ? ORDER BY id');
+    $docs = db()->prepare('SELECT id, doc_type, file_name, mime_type, file_size, uploaded_at, status, note FROM documents WHERE application_id = ? ORDER BY id');
     $docs->execute([$app['id']]);
     $documents = $docs->fetchAll();
 

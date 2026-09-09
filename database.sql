@@ -43,13 +43,23 @@ CREATE TABLE applications (
   essay_score      TINYINT      NOT NULL DEFAULT 7,   -- 0-10
   requested        INT          NOT NULL DEFAULT 4000,
   submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  -- Partial unique keys (Section 12): one active application per email/phone.
+  -- active_email/active_phone are NULL when the application is rejected, so
+  -- a rejected applicant may re-apply in a later window.
+  active_email VARCHAR(160) AS (IF(status='rejected', NULL, LOWER(email))) STORED,
+  active_phone VARCHAR(20)  AS (IF(status='rejected', NULL, phone))        STORED,
+  UNIQUE KEY uniq_active_email (active_email),
+  UNIQUE KEY uniq_active_phone (active_phone),
   INDEX (email),
   INDEX (phone),
   INDEX (status)
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------
--- Uploaded documents (4 required types per application)
+-- Uploaded documents (4 required types per application).
+-- File contents are stored directly in the database (file_data LONGBLOB).
+-- stored_path is kept only for pre-database-migration rows; new uploads
+-- never write to disk.
 -- ---------------------------------------------------------------------
 CREATE TABLE documents (
   id             INT AUTO_INCREMENT PRIMARY KEY,
@@ -57,7 +67,11 @@ CREATE TABLE documents (
   doc_type       ENUM('Registration Form','School ID with 3 Signatures',
                       'Barangay Indigency','Certificate of Grade (COG)') NOT NULL,
   file_name      VARCHAR(255) NOT NULL,
+  mime_type      VARCHAR(100) NULL,
+  file_size      BIGINT       NULL,
+  file_data      LONGBLOB     NULL,
   stored_path    VARCHAR(255) NULL,
+  uploaded_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   status         ENUM('pending','verified','rejected') NOT NULL DEFAULT 'pending',
   note           VARCHAR(255) NULL,
   FOREIGN KEY (application_id) REFERENCES applications(id) ON DELETE CASCADE,
@@ -77,6 +91,28 @@ CREATE TABLE timeline (
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------
+-- Audit log (structured record of admin actions and decisions)
+-- ---------------------------------------------------------------------
+CREATE TABLE audit_log (
+  id              INT AUTO_INCREMENT PRIMARY KEY,
+  admin_id        INT NULL,
+  admin_email     VARCHAR(160) NULL,
+  action          VARCHAR(60) NOT NULL,      -- login, app_decision, doc_verified, doc_rejected...
+  application_id  INT NULL,
+  document_id     INT NULL,
+  previous_status VARCHAR(40) NULL,
+  new_status      VARCHAR(40) NULL,
+  remarks         VARCHAR(500) NULL,
+  created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (admin_id) REFERENCES admins(id) ON DELETE SET NULL,
+  FOREIGN KEY (application_id) REFERENCES applications(id) ON DELETE SET NULL,
+  FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE SET NULL,
+  INDEX (application_id),
+  INDEX (document_id),
+  INDEX (created_at)
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------
 -- Notifications (system-wide activity log)
 -- ---------------------------------------------------------------------
 CREATE TABLE notifications (
@@ -89,14 +125,18 @@ CREATE TABLE notifications (
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------
--- Settings (single row: cycle budget)
+-- Settings (cycle budget + application window)
 -- ---------------------------------------------------------------------
 CREATE TABLE settings (
   skey  VARCHAR(40) PRIMARY KEY,
   svalue VARCHAR(120) NOT NULL
 ) ENGINE=InnoDB;
 
-INSERT INTO settings (skey, svalue) VALUES ('budget', '250000');
+INSERT INTO settings (skey, svalue) VALUES
+  ('budget', '250000'),
+  ('application_window', 'OPEN'),
+  ('application_open_date', 'January 15, 2026'),
+  ('application_close_date', 'December 15, 2026');
 
 -- =====================================================================
 -- Demo data

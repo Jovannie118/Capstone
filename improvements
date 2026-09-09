@@ -1,0 +1,963 @@
+I want you to improve my existing Web-Based Scholarship Management System for LGU Paracale.
+
+IMPORTANT:
+Do NOT rebuild the entire system from scratch.
+
+First inspect the existing codebase, database structure, PHP APIs, JavaScript, HTML, and CSS. Understand how the current system works before making changes.
+
+The goal is to improve the existing system while preserving the working features and UI as much as possible.
+
+PROJECT:
+Web-Based Scholarship Management System for LGU Paracale
+Municipality of Paracale, Camarines Norte
+
+TECHNOLOGY:
+- HTML5
+- CSS
+- Vanilla JavaScript
+- PHP 8
+- PDO
+- MySQL/MariaDB
+
+==================================================
+1. DOCUMENT STORAGE — IMPORTANT
+==================================================
+
+Change the document upload system so uploaded scholarship documents are stored DIRECTLY IN THE DATABASE instead of being permanently saved on the server disk.
+
+Documents may include:
+- Registration Form
+- School ID
+- Barangay Indigency
+- Certificate of Grade (COG)
+- Other scholarship requirements
+
+Requirements:
+
+- Store the actual binary file data in MySQL/MariaDB using LONGBLOB or an appropriate binary type.
+- Store the original filename.
+- Store MIME type.
+- Store file size.
+- Store upload date/time.
+- Store the related application ID.
+- Store document type.
+- Store document verification status.
+- Store rejection remarks when applicable.
+
+The server must NOT permanently save uploaded documents in:
+- uploads/
+- documents/
+- storage/
+- public folders
+- or any other permanent disk directory.
+
+PHP's temporary upload file may exist during processing, but after the database insertion succeeds, the temporary file should not remain as permanent storage.
+
+Use prepared statements and secure database handling.
+
+If the existing database already has a documents table, MODIFY it instead of unnecessarily creating a duplicate table.
+
+==================================================
+2. DOCUMENT VIEWER
+==================================================
+
+Fix and improve document viewing.
+
+The current system has a critical problem where documents cannot be viewed because the system looks for the applicant's original filename while the saved file uses a different name.
+
+Since documents will now be stored in the database:
+
+Create or modify the document viewing endpoint so it retrieves the document using its document ID.
+
+Example:
+
+GET:
+api/view_document.php?id=123
+
+The endpoint should:
+
+1. Verify the logged-in admin.
+2. Retrieve the document from the database.
+3. Retrieve:
+   - file_data
+   - original_filename
+   - mime_type
+   - file_size
+4. Return the file directly to the browser.
+5. Support PDF, JPG, JPEG, PNG and other currently allowed file types.
+6. Use the correct Content-Type.
+7. Allow PDFs/images to be previewed in the browser.
+8. Do not expose the database or filesystem path.
+
+For example:
+
+Content-Type: application/pdf
+
+or:
+
+Content-Type: image/jpeg
+
+==================================================
+3. DOCUMENT TABLE UI
+==================================================
+
+Improve the document list in the admin application details page.
+
+The table should have:
+
+DOCUMENT | FILE | STATUS | ACTION
+
+Example:
+
+Registration Form | registration-form.pdf | rejected | View
+School ID with 3 Signatures | school-id.jpg | pending | View
+Barangay Indigency | barangay-indigency.pdf | pending | View
+Certificate of Grade | cog.pdf | pending | View
+
+IMPORTANT UI REQUIREMENT:
+
+The "View" button must NOT be beside the document name.
+
+Move the View button to the far-right ACTION column.
+
+The View button must be horizontally aligned with the corresponding document's status.
+
+Keep the existing design style, spacing, borders, fonts, and button appearance.
+
+==================================================
+4. PER-DOCUMENT VERIFICATION
+==================================================
+
+Fix the current verification system.
+
+The current verification interface incorrectly calls the whole-application decision endpoint when approving/rejecting individual documents.
+
+Each document must have its own verification status.
+
+Possible statuses:
+
+- Pending
+- Verified
+- Rejected
+
+For rejected documents, allow the admin to enter a clear rejection reason.
+
+Example:
+
+School ID
+Status: Rejected
+Reason: Missing required signatures.
+
+The admin should be able to:
+
+- View document
+- Verify document
+- Reject document
+- Enter rejection reason
+
+Do NOT automatically change the entire application's status when only one document is being verified unless that behavior is explicitly required by the existing business logic.
+
+==================================================
+5. APPLICATION APPROVAL
+==================================================
+
+Keep the existing:
+
+- Approve
+- Reject
+- Waitlist
+
+functionality.
+
+Improve it so that application decisions are properly recorded in the database.
+
+Every decision should create an audit/timeline record containing:
+
+- Application ID
+- Admin ID
+- Previous status
+- New status
+- Date/time
+- Remarks/reason if applicable
+
+Do not create fake notification logs.
+
+If an email/SMS was not actually sent, do not record that it was sent.
+
+==================================================
+6. RANKING AND SCORING SYSTEM
+==================================================
+
+The existing backend already contains a scoring formula involving:
+
+- GPA
+- Household income
+- Extracurricular activities
+- Essay score
+
+Connect the scoring system to REAL applicant data.
+
+Do not leave these values as hardcoded/default values.
+
+There are two acceptable approaches:
+
+OPTION A:
+Add the required scoring fields to the application form.
+
+OR
+
+OPTION B:
+Create an admin-side scoring/evaluation page where authorized staff can enter or evaluate:
+
+- GPA
+- Household income
+- Extracurricular activities
+- Essay score
+
+Then calculate the applicant's total score using the existing scoring formula.
+
+The ranking page should display:
+
+Rank
+Applicant
+Application ID
+GPA
+Income
+Extracurricular Score
+Essay Score
+Total Score
+Status
+
+Applicants with higher scores should be ranked appropriately according to the existing formula.
+
+Do not invent a completely different scoring formula unless necessary.
+
+==================================================
+7. SMS NOTIFICATION
+==================================================
+
+Implement the SMS notification feature promised by the project.
+
+Create a proper notification service that can send SMS when:
+
+1. Application is successfully submitted.
+2. Application is approved.
+3. Application is rejected.
+4. Application is waitlisted.
+5. A document is rejected.
+
+Use a Philippine SMS gateway such as Semaphore or another appropriate provider.
+
+IMPORTANT:
+
+Do not put API keys directly in source code.
+
+Use environment variables or secure configuration.
+
+Create a reusable function such as:
+
+sendSMS($phoneNumber, $message)
+
+Log:
+
+- recipient
+- message type
+- status
+- date/time
+- related application ID
+
+Only mark an SMS as SENT if the gateway actually confirms successful sending.
+
+==================================================
+8. EMAIL NOTIFICATION
+==================================================
+
+Implement real email notification.
+
+Use PHPMailer with SMTP or another reliable SMTP implementation.
+
+Send an email when an applicant is accepted/approved.
+
+The email should contain:
+
+- Applicant name
+- Application ID
+- Scholarship/application status
+- Important instructions
+- LGU Paracale scholarship contact information
+
+Do not claim that an email was sent if the email service failed.
+
+The notification record should contain the actual result.
+
+==================================================
+9. APPLICATION WINDOW
+==================================================
+
+Add an admin-controlled application window.
+
+The admin should be able to:
+
+OPEN or CLOSE applications.
+
+Add appropriate settings to the database.
+
+Example:
+
+application_window = OPEN
+
+or
+
+application_window = CLOSED
+
+When CLOSED:
+
+- Applicants cannot submit a new application.
+- The public page should clearly say that applications are currently closed.
+- Display the application opening/closing information if available.
+
+When OPEN:
+
+- Applicants can submit normally.
+
+Do not use hardcoded "Application window: Open" text.
+
+The homepage must reflect the actual database setting.
+
+==================================================
+10. BATCH APPROVAL
+==================================================
+
+Implement batch processing for scholarship applications.
+
+The admin should be able to:
+
+- Select individual applications.
+- Select all visible applications.
+- Approve selected applications.
+- Reject selected applications.
+- Waitlist selected applications.
+
+Add checkboxes to the application table.
+
+Add:
+
+[ Select All ]
+
+and bulk action controls.
+
+The backend must validate every selected application ID before processing.
+
+Every application must receive its own audit/timeline entry.
+
+Do not process unauthorized or invalid application IDs.
+
+==================================================
+11. APPLICATION SEARCH AND FILTER
+==================================================
+
+Improve the Applications and Verification pages.
+
+Add:
+
+- Search by applicant name
+- Search by Application ID
+- Search by email
+- Search by mobile number
+- Filter by status
+- Filter by document verification status
+- Pagination
+
+The verification queue should not simply display a long unfiltered list.
+
+Use database queries efficiently rather than loading every record into the browser.
+
+==================================================
+12. DUPLICATE APPLICATION PROTECTION
+==================================================
+
+Prevent duplicate submissions.
+
+Before accepting an application, check whether the same:
+
+- Email address
+- Mobile number
+
+already has an active/recent application.
+
+If a duplicate is detected:
+
+Display a clear message such as:
+
+"An application using this email address or mobile number already exists."
+
+Do not silently create another application.
+
+Use database constraints where appropriate.
+
+==================================================
+13. APPLICATION ID GENERATION
+==================================================
+
+Improve Application ID generation.
+
+The current system uses a random number and can potentially generate a duplicate.
+
+Create a collision-safe system.
+
+Before inserting:
+
+1. Generate Application ID.
+2. Check whether it already exists.
+3. If it exists, generate another ID.
+4. Retry a reasonable number of times.
+5. Use a UNIQUE database constraint.
+
+Never allow duplicate Application IDs.
+
+==================================================
+14. FILE UPLOAD SECURITY
+==================================================
+
+Improve upload security.
+
+Do NOT rely only on file extensions.
+
+Validate:
+
+- Upload error
+- File size
+- MIME type
+- File contents/magic bytes
+- Allowed extension
+- Actual file type
+
+Reject dangerous files such as:
+
+.php
+.exe
+.js
+.sh
+.bat
+
+Only allow the document types required by the scholarship system.
+
+Return clear errors to applicants.
+
+For example:
+
+"School ID exceeds the maximum allowed file size."
+
+Do not show confusing server errors.
+
+==================================================
+15. MULTI-FILE UPLOAD
+==================================================
+
+The system allows multiple scholarship documents.
+
+Make sure every uploaded file is independently checked.
+
+For every file:
+
+- Check upload error.
+- Check size.
+- Check MIME type.
+- Check actual content.
+- Store it in the database.
+- Associate it with the correct application.
+
+If one file fails, clearly tell the applicant which file failed and why.
+
+Do not silently drop uploaded files.
+
+==================================================
+16. CLIENT-SIDE VALIDATION
+==================================================
+
+Improve the application form.
+
+Add:
+
+- Email validation
+- Mobile number validation
+- Required field validation
+- File type validation
+- File size warning
+- Clear error messages
+
+The server-side validation must remain the final authority.
+
+Do not rely only on JavaScript validation.
+
+==================================================
+17. DUPLICATE SUBMISSION PROTECTION
+==================================================
+
+Prevent accidental double submission.
+
+When the applicant clicks Submit:
+
+- Disable the submit button.
+- Show a loading state.
+- Prevent another submission while the request is processing.
+- Re-enable the button if the request fails.
+
+Example:
+
+"Submitting Application..."
+
+Do not create duplicate applications from double-clicking.
+
+==================================================
+18. ADMIN SECURITY
+==================================================
+
+Remove any real admin password from the HTML source.
+
+Never place:
+
+value="actual-password"
+
+inside the login form.
+
+The login form should have an empty password field.
+
+Keep backend password verification using:
+
+password_hash()
+password_verify()
+
+Do not hardcode administrator credentials in frontend files.
+
+Use secure sessions.
+
+Implement:
+
+- Session authentication
+- Session timeout where appropriate
+- Authorization checks
+- Protected API endpoints
+
+Every admin API must verify authentication.
+
+==================================================
+19. ADMIN DASHBOARD
+==================================================
+
+Improve the dashboard using real database data.
+
+Display useful statistics such as:
+
+- Total Applications
+- Pending Applications
+- Verified Applications
+- Approved Applications
+- Rejected Applications
+- Waitlisted Applications
+- Documents Pending Verification
+
+If possible, display:
+
+- Recent applications
+- Recent decisions
+- Recent notifications
+
+Do not use dummy statistics.
+
+==================================================
+20. REPORTS
+==================================================
+
+Improve the Reports page.
+
+Reports should use actual database records.
+
+Allow administrators to filter reports by:
+
+- Date
+- Status
+- School
+- Scholarship batch
+- Approval status
+
+Keep the existing CSV export functionality.
+
+If possible, add summary information such as:
+
+Total Applicants
+Approved
+Rejected
+Waitlisted
+Pending
+
+Do not break the existing CSV export.
+
+==================================================
+21. SCHOLARSHIP BATCH MANAGEMENT
+==================================================
+
+Create a scholarship batch concept if the current database structure allows it.
+
+Example:
+
+Batch 2026-A
+Batch 2026-B
+
+Allow admins to assign approved applicants to a batch.
+
+Display:
+
+- Batch name
+- Number of scholars
+- Total estimated amount
+- Approval date
+- Status
+
+This should support the project's requirement for awarding scholarships by batch.
+
+==================================================
+22. LANDING PAGE IMPROVEMENT
+==================================================
+
+Improve the public homepage.
+
+Keep the existing design but add useful sections such as:
+
+1. About the Scholarship Program
+2. How to Apply
+3. Requirements
+4. Application Process
+5. Scholarship Achievements
+6. Past Scholarship Recipients
+7. Program Outcomes
+8. Funding Transparency
+9. Frequently Asked Questions
+10. Contact Information
+11. Application Window Status
+
+Do NOT invent real statistics, recipients, funding amounts, testimonials, or achievements.
+
+If actual data is not available, create clearly labeled placeholder content that can later be replaced by LGU Paracale.
+
+==================================================
+23. APPLICATION STATUS TRACKING
+==================================================
+
+Keep the existing Application ID/email status tracking.
+
+Improve the status page so applicants can see:
+
+Application Status
+Document Status
+Timeline
+Remarks
+Important Instructions
+
+Example:
+
+Application Submitted
+↓
+Documents Under Review
+↓
+Documents Verified
+↓
+Application Evaluated
+↓
+Approved
+
+Do not expose sensitive information belonging to other applicants.
+
+==================================================
+24. NOTIFICATION CENTER
+==================================================
+
+Improve the admin Notifications page.
+
+Show:
+
+- Notification type
+- Applicant
+- Application ID
+- Message
+- Status
+- Date/time
+
+Types:
+
+SMS
+EMAIL
+SYSTEM
+
+Add notification status:
+
+Pending
+Sent
+Failed
+
+Do not falsely mark failed notifications as sent.
+
+==================================================
+25. AUDIT TRAIL
+==================================================
+
+Make sure important admin actions are recorded.
+
+Record:
+
+- Login
+- Application verification
+- Document verification
+- Document rejection
+- Application approval
+- Application rejection
+- Waitlisting
+- Batch approval
+- Changes to application settings
+
+Each audit record should contain:
+
+- Admin
+- Action
+- Application/document
+- Date/time
+- Remarks
+
+==================================================
+26. ADMIN MOBILE RESPONSIVENESS
+==================================================
+
+Improve the admin interface on mobile devices.
+
+The current navigation wraps and becomes cramped.
+
+Implement a responsive navigation drawer/hamburger menu.
+
+Tables should remain usable on smaller screens.
+
+Do not destroy the desktop layout.
+
+Make sure:
+
+- Buttons remain accessible.
+- Tables can scroll horizontally when necessary.
+- Forms remain readable.
+- Cards resize properly.
+- Navigation works on mobile.
+
+==================================================
+27. DATABASE INTEGRITY
+==================================================
+
+Review the database schema.
+
+Use:
+
+- Primary keys
+- Foreign keys
+- UNIQUE constraints
+- Appropriate indexes
+- NOT NULL where appropriate
+
+Pay special attention to:
+
+applications
+documents
+admins
+timeline
+notifications
+settings
+
+Do not delete existing production/sample data unless absolutely necessary.
+
+If a schema change is required, provide an ALTER TABLE migration instead of blindly replacing the entire database.
+
+==================================================
+28. PERFORMANCE
+==================================================
+
+Do not load huge document BLOBs when displaying normal application lists.
+
+For application tables, retrieve only metadata:
+
+- Document ID
+- Filename
+- MIME type
+- File size
+- Status
+
+Only retrieve the actual file_data BLOB when the user clicks:
+
+VIEW
+or
+DOWNLOAD
+
+Use efficient SQL queries and pagination.
+
+==================================================
+29. UI/UX CONSISTENCY
+==================================================
+
+Preserve the current visual identity.
+
+Do not unnecessarily redesign the entire application.
+
+Improve:
+
+- spacing
+- alignment
+- status badges
+- buttons
+- loading states
+- error messages
+- empty states
+- confirmation dialogs
+
+Use consistent labels.
+
+Example statuses:
+
+Pending
+Verified
+Rejected
+Approved
+Waitlisted
+
+==================================================
+30. IMPORTANT IMPLEMENTATION RULE
+==================================================
+
+Before modifying anything:
+
+1. Inspect the complete project structure.
+2. Identify all related files.
+3. Identify the database schema.
+4. Identify existing API endpoints.
+5. Identify existing JavaScript functions.
+6. Identify existing document upload/view code.
+7. Identify authentication/session handling.
+8. Identify existing scoring logic.
+9. Identify notification placeholders.
+10. Identify existing UI components.
+
+Then make the changes incrementally.
+
+Do NOT create duplicate functionality.
+
+Reuse existing functions/endpoints when they are correct.
+
+If an existing endpoint is broken, fix it rather than creating another endpoint unnecessarily.
+
+==================================================
+31. PRIORITY ORDER
+==================================================
+
+Implement improvements in this order:
+
+PHASE 1 — CRITICAL
+1. Database document storage
+2. Document viewing
+3. Per-document verification
+4. File upload validation/security
+5. Admin password security
+6. Authentication/authorization
+7. Correct audit trail
+
+PHASE 2 — CORE PROJECT FEATURES
+8. Real applicant scoring/ranking
+9. SMS notification
+10. Email notification
+11. Application-window control
+12. Batch approval
+13. Search/filter/pagination
+14. Duplicate application protection
+15. Collision-safe Application ID
+
+PHASE 3 — IMPROVEMENT
+16. Dashboard improvements
+17. Reports improvements
+18. Scholarship batch management
+19. Landing page improvements
+20. Status tracking improvements
+21. Notification center
+22. Mobile navigation
+23. Client-side validation
+24. Double-submit protection
+
+==================================================
+32. TESTING
+==================================================
+
+After implementing the changes, test the complete workflow:
+
+APPLICANT:
+
+1. Open application form.
+2. Fill out applicant information.
+3. Upload multiple documents.
+4. Submit application.
+5. Verify documents are stored in the DATABASE.
+6. Verify permanent document files are NOT created on disk.
+7. Receive/record submission notification.
+8. Track application using Application ID.
+
+ADMIN:
+
+1. Login.
+2. View dashboard.
+3. View applications.
+4. Open an application.
+5. Click View beside a document.
+6. Verify PDF/image opens correctly.
+7. Verify one document.
+8. Reject another document.
+9. Enter rejection remarks.
+10. Approve/reject application.
+11. Verify timeline/audit log.
+12. Test SMS notification.
+13. Test email notification.
+14. Test batch approval.
+15. Test search/filter.
+16. Test reports.
+17. Open system on mobile width.
+
+SECURITY TEST:
+
+- Try uploading an invalid file.
+- Try uploading an oversized file.
+- Try uploading a renamed dangerous file.
+- Try accessing another document by changing its ID.
+- Try accessing admin APIs without login.
+- Try submitting duplicate applications.
+- Try double-clicking Submit.
+- Try generating duplicate Application IDs.
+
+==================================================
+33. FINAL RESPONSE
+==================================================
+
+After completing the implementation, provide:
+
+1. Summary of improvements.
+2. List of modified files.
+3. New database tables/columns.
+4. SQL migration code.
+5. New/modified API endpoints.
+6. Explanation of document storage.
+7. Explanation of document viewing.
+8. Explanation of document verification.
+9. Explanation of scoring/ranking.
+10. Explanation of SMS/email notifications.
+11. Explanation of batch approval.
+12. Security improvements.
+13. Testing results.
+14. Any remaining issues.
+
+IMPORTANT:
+Do not claim a feature is implemented if it is only a placeholder.
+
+Do not use fake SMS/email success responses.
+
+Do not use dummy database data for features that are supposed to use real data.
+
+The final system should be a functional, secure, database-driven Scholarship Management System suitable for Capstone defense.

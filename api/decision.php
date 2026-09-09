@@ -17,20 +17,27 @@ if (!$appId || !in_array($status, $allowed, true)) {
 }
 
 $pdo  = db();
-$stmt = $pdo->prepare('SELECT ref_code, full_name FROM applications WHERE id = ?');
+$stmt = $pdo->prepare('SELECT ref_code, full_name, status FROM applications WHERE id = ?');
 $stmt->execute([$appId]);
 $app = $stmt->fetch();
 if (!$app) {
     json_out(['error' => 'Application not found.'], 404);
 }
 
+$prevStatus = $app['status'];
+
 $pdo->prepare('UPDATE applications SET status = ? WHERE id = ?')->execute([$status, $appId]);
 
 $label = STATUS_LABEL[$status];
-add_timeline($appId, $label . ($note !== '' ? ' - ' . $note : ''), 'Review Committee');
+$actor = current_admin()['name'] ?? 'Review Committee';
+
+add_timeline($appId, $label . ($note !== '' ? ' - ' . $note : ''), $actor);
+add_audit('app_decision', $appId, null, $prevStatus, $status, $note !== '' ? $note : null);
+
 add_notification(
     $app['ref_code'] . ' ' . strtolower($label),
-    $note !== '' ? $note : $app['full_name'] . ' was notified by email about the ' . strtolower($label) . ' decision.',
+    'Status changed from ' . $prevStatus . ' to ' . $status . '.'
+        . ($note !== '' ? ' Reason: ' . $note : ''),
     $status === 'approved' ? 'success' : ($status === 'rejected' ? 'warning' : 'info')
 );
 

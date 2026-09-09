@@ -35,8 +35,10 @@ if ($action === 'login') {
         json_out(['error' => 'Those credentials do not match our records.'], 401);
     }
 
+    $_SESSION['admin_id']    = (int) $admin['id'];
     $_SESSION['admin_email'] = $admin['email'];
     $_SESSION['admin_name']  = $admin['full_name'];
+    add_audit('login', 0, null, null, null, 'Administrator signed in.');
     json_out(['signedIn' => true, 'email' => $admin['email'], 'name' => $admin['full_name']]);
 }
 

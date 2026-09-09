@@ -23,7 +23,7 @@ initShell({ active: 'dashboard.html', admin: true }).then(async (session) => {
   if (!session) return;
   const body = document.getElementById('body');
   try {
-    const { applications: apps, budget } = await apiGet('applications.php');
+    const { applications: apps, budget } = await apiGet('applications.php?per_page=500');
     const count = (s) => apps.filter((a) => a.status === s).length;
     const committed = apps.filter((a) => a.status === 'approved').reduce((s, a) => s + Number(a.requested), 0);
     const pendingDocs = apps.reduce((s, a) => s + a.documents.filter((d) => d.status !== 'verified').length, 0);

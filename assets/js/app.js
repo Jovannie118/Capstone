@@ -188,7 +188,7 @@ function closeDocModal() {
  */
 function openDocModal(doc) {
   const modal = docModalEl();
-  const url = API + 'document.php?id=' + doc.id;
+  const url = API + 'view_document.php?id=' + doc.id;
   const ext = (doc.file_name.split('.').pop() || '').toLowerCase();
   const body = document.getElementById('docModalBody');
 

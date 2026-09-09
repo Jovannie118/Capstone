@@ -26,7 +26,7 @@ function note(msg, kind) { alertBox.className = 'alert alert-' + (kind || 'succe
 async function load() {
   const body = document.getElementById('body');
   try {
-    const { applications, budget } = await apiGet('applications.php');
+    const { applications, budget } = await apiGet('applications.php?per_page=500');
     const committed = applications.filter((a) => a.status === 'approved').reduce((s, a) => s + Number(a.requested), 0);
     const remaining = Math.max(0, budget - committed);
     const ranked = [...applications].sort((a, b) => b.score - a.score);
@@ -42,9 +42,9 @@ async function load() {
         '<td>' + statusBadge(a.status, a.status_label) +
           (allVerified ? '' : '<div class="muted small">Documents incomplete</div>') + '</td>' +
         '<td class="row">' +
-          '<button class="btn btn-success btn-sm" data-app="' + a.id + '" data-status="approved"' + (allVerified ? '' : ' disabled') + '>Approve</button>' +
-          '<button class="btn btn-outline btn-sm" data-app="' + a.id + '" data-status="waitlisted">Waitlist</button>' +
-          '<button class="btn btn-danger btn-sm" data-app="' + a.id + '" data-status="rejected">Decline</button>' +
+          '<button class="btn btn-success btn-sm" data-app="' + a.id + '" data-ref="' + a.ref_code + '" data-status="approved"' + (allVerified ? '' : ' disabled') + '>Approve</button>' +
+          '<button class="btn btn-outline btn-sm" data-app="' + a.id + '" data-ref="' + a.ref_code + '" data-status="waitlisted">Waitlist</button>' +
+          '<button class="btn btn-danger btn-sm" data-app="' + a.id + '" data-ref="' + a.ref_code + '" data-status="rejected">Decline</button>' +
         '</td></tr>';
     }).join('');
 
@@ -61,15 +61,81 @@ async function load() {
         '<th>#</th><th>Applicant</th><th>Mobile</th><th class="num">Score</th><th class="num">Requested</th><th>Status</th><th>Decision</th>' +
         '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
 
-    body.querySelectorAll('button[data-app]').forEach((btn) => {
-      btn.addEventListener('click', async () => {
+    const DECISION_LABEL = { approved: 'Approve', waitlisted: 'Waitlist', rejected: 'Decline' };
+    let decisionTarget = null;
+
+    function ensureDecisionModal() {
+      let m = document.getElementById('decisionModal');
+      if (m) return m;
+
+      m = document.createElement('div');
+      m.id = 'decisionModal';
+      m.className = 'modal-overlay hidden';
+      m.innerHTML =
+        '<div class="modal">' +
+          '<div class="modal-head">' +
+            '<h3 id="decisionModalTitle"></h3>' +
+            '<button class="btn btn-outline btn-sm" id="decisionModalClose" type="button">Close</button>' +
+          '</div>' +
+          '<div class="modal-body">' +
+            '<p class="muted small" id="decisionModalApp"></p>' +
+            '<div class="field">' +
+              '<label for="decisionReason">Remarks / reason (optional)</label>' +
+              '<textarea id="decisionReason" rows="3" placeholder="e.g. Meets all requirements and documents verified."></textarea>' +
+            '</div>' +
+          '</div>' +
+          '<div class="modal-foot">' +
+            '<button class="btn btn-outline btn-sm" id="decisionModalCancel" type="button">Cancel</button>' +
+            '<button class="btn btn-primary btn-sm" id="decisionModalConfirm" type="button">Record decision</button>' +
+          '</div>' +
+        '</div>';
+      document.body.appendChild(m);
+
+      m.addEventListener('click', (e) => { if (e.target === m) closeDecisionModal(); });
+      document.getElementById('decisionModalClose').addEventListener('click', closeDecisionModal);
+      document.getElementById('decisionModalCancel').addEventListener('click', closeDecisionModal);
+      document.getElementById('decisionModalConfirm').addEventListener('click', async () => {
+        const btn = document.getElementById('decisionModalConfirm');
+        if (!decisionTarget) return;
         btn.disabled = true;
         try {
-          await apiPost('decision.php', { app_id: Number(btn.dataset.app), status: btn.dataset.status });
-          note('Decision recorded: ' + btn.dataset.status + '.');
+          await apiPost('decision.php', {
+            app_id: decisionTarget.appId,
+            status: decisionTarget.status,
+            note: document.getElementById('decisionReason').value.trim(),
+          });
+          closeDecisionModal();
+          note('Decision recorded: ' + decisionTarget.status + '.');
           load();
-        } catch (err) { note(err.message, 'error'); btn.disabled = false; }
+        } catch (err) {
+          note(err.message, 'error');
+          btn.disabled = false;
+        }
       });
+
+      return m;
+    }
+
+    function openDecisionModal(appId, status, ref) {
+      decisionTarget = { appId, status };
+      const label = DECISION_LABEL[status] || 'Update';
+      const m = ensureDecisionModal();
+      document.getElementById('decisionModalTitle').textContent = label + ' application';
+      document.getElementById('decisionModalApp').textContent = ref;
+      document.getElementById('decisionReason').value = '';
+      document.getElementById('decisionModalConfirm').disabled = false;
+      m.classList.remove('hidden');
+    }
+
+    function closeDecisionModal() {
+      const m = document.getElementById('decisionModal');
+      if (!m) return;
+      m.classList.add('hidden');
+      decisionTarget = null;
+    }
+
+    body.querySelectorAll('button[data-app]').forEach((btn) => {
+      btn.addEventListener('click', () => openDecisionModal(Number(btn.dataset.app), btn.dataset.status, btn.dataset.ref));
     });
   } catch (err) {
     body.innerHTML = '<div class="alert alert-error">' + esc(err.message) + '</div>';

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Settings - Paracale Scholarships</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;600;800&display=swap">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<main>
+  <div class="page-header">
+    <h1>Settings</h1>
+    <p>Control the application window and the dates shown to applicants on the homepage.</p>
+  </div>
+  <div id="alert" class="hidden"></div>
+  <div id="body"></div>
+</main>
+
+<script src="assets/js/app.js"></script>
+<script>
+footer();
+const alertBox = document.getElementById('alert');
+function note(msg, kind) { alertBox.className = 'alert alert-' + (kind || 'success'); alertBox.textContent = msg; }
+
+initShell({ active: 'settings.html', admin: true }).then(async (session) => {
+  if (!session) return;
+  const body = document.getElementById('body');
+  try {
+    const s = await apiGet('settings.php');
+
+    body.innerHTML =
+      '<div class="panel">' +
+        '<div class="panel-head"><h2>Application window</h2></div>' +
+        '<div class="field">' +
+          '<label>Application window</label>' +
+          '<div class="row">' +
+            '<label class="row" style="gap:.35rem"><input type="radio" name="window" value="OPEN"' + (s.application_window === 'OPEN' ? ' checked' : '') + '> Open &mdash; applicants can submit</label>' +
+            '<label class="row" style="gap:.35rem"><input type="radio" name="window" value="CLOSED"' + (s.application_window === 'CLOSED' ? ' checked' : '') + '> Closed &mdash; submissions blocked</label>' +
+          '</div>' +
+        '</div>' +
+        '<div class="grid cols-2">' +
+          '<div class="field"><label for="openDate">Opening date (optional)</label>' +
+            '<input type="text" id="openDate" maxlength="120" placeholder="e.g. January 15, 2026" value="' + esc(s.application_open_date || '') + '"></div>' +
+          '<div class="field"><label for="closeDate">Closing date (optional)</label>' +
+            '<input type="text" id="closeDate" maxlength="120" placeholder="e.g. December 15, 2026" value="' + esc(s.application_close_date || '') + '"></div>' +
+        '</div>' +
+        '<div class="row">' +
+          '<button class="btn btn-primary" id="saveBtn" type="button">Save settings</button>' +
+          '<a class="btn btn-outline" href="index.html" target="_blank" rel="noopener">View homepage</a>' +
+        '</div>' +
+      '</div>' +
+      '<div class="panel"><div class="panel-head"><h2>Public message preview</h2></div>' +
+        '<p class="muted small">This is exactly what applicants see at the top of the homepage.</p>' +
+        '<div id="preview" class="alert"></div>' +
+      '</div>';
+
+    async function refreshPreview(status) {
+      try {
+        const win = await apiGet('window.php');
+        const el = document.getElementById('preview');
+        el.className = 'alert ' + (win.status === 'OPEN' ? 'alert-success' : 'alert-error');
+        el.textContent = win.message;
+      } catch (e) { /* preview is best-effort */ }
+    }
+    refreshPreview();
+
+    document.getElementById('saveBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('saveBtn');
+      const window = document.querySelector('input[name="window"]:checked').value;
+      btn.disabled = true;
+      try {
+        await apiPost('settings.php', {
+          application_window: window,
+          application_open_date: document.getElementById('openDate').value.trim(),
+          application_close_date: document.getElementById('closeDate').value.trim(),
+        });
+        note('Settings saved.');
+        refreshPreview();
+      } catch (err) {
+        note(err.message, 'error');
+      }
+      btn.disabled = false;
+    });
+  } catch (err) {
+    body.innerHTML = '<div class="alert alert-error">' + esc(err.message) + '</div>';
+  }
+});
+</script>
+</body>
+</html>

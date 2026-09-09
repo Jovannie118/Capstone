@@ -73,6 +73,21 @@ document.getElementById('docFields').innerHTML = DOC_TYPES.map((type, i) => (
 
 const alertBox = document.getElementById('alert');
 
+(async () => {
+  try {
+    const win = await apiGet('window.php');
+    const open = win.status === 'OPEN' || !win.status;
+    const banner = document.createElement('div');
+    banner.className = 'alert ' + (open ? 'alert-info' : 'alert-error');
+    banner.textContent = win.message;
+    const panel = document.getElementById('formPanel');
+    panel.parentNode.insertBefore(banner, panel);
+    if (!open) {
+      document.getElementById('submitBtn').disabled = true;
+    }
+  } catch (e) { /* endpoint unavailable - leave the form enabled */ }
+})();
+
 function clearErrors() {
   document.querySelectorAll('[data-error]').forEach((el) => { el.textContent = ''; el.classList.add('hidden'); });
   alertBox.className = 'hidden';

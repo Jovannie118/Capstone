@@ -11,7 +11,7 @@
 <main>
   <div class="page-header">
     <h1>Document verification</h1>
-    <p>Click View to preview each uploaded file.</p>
+    <p>Search the queue or filter by status and document verification state. Click View to preview each uploaded file.</p>
   </div>
   <div id="alert" class="hidden"></div>
   <div id="body"></div>
@@ -27,39 +27,165 @@ function note(msg, kind) {
   alertBox.textContent = msg;
 }
 
-function card(a) {
-  const docs = a.documents.map((d) => (
-    '<tr><td class="row">' + esc(d.doc_type) +
-      '<button class="btn btn-outline btn-sm" data-view="' + d.id + '">View</button>' +
-    '</td><td class="muted small">' + esc(d.file_name) + '</td>' +
-    '<td>' + statusBadge(d.status) + (d.note ? '<div class="muted small">' + esc(d.note) + '</div>' : '') + '</td>' +
-    '</tr>'
-  )).join('');
+let page = 1;
 
-  const decided = a.status === 'approved' || a.status === 'rejected';
+function card(a) {
+  const verified = a.doc_verified;
+  const docs = a.documents.map((d) => {
+    const vDisabled = d.status === 'verified' ? ' disabled' : '';
+    const rDisabled = d.status === 'rejected' ? ' disabled' : '';
+    return '<tr><td>' + esc(d.doc_type) + '</td>' +
+      '<td class="muted small">' + esc(d.file_name) + '</td>' +
+      '<td>' + statusBadge(d.status) + (d.note ? '<div class="muted small">' + esc(d.note) + '</div>' : '') + '</td>' +
+      '<td class="row">' +
+        '<button class="btn btn-outline btn-sm" data-view="' + d.id + '">View</button>' +
+        '<button class="btn btn-success btn-sm" data-verify="' + d.id + '"' + vDisabled + '>Verify</button>' +
+        '<button class="btn btn-danger btn-sm" data-reject="' + d.id + '"' + rDisabled + '>Reject</button>' +
+      '</td>' +
+    '</tr>';
+  }).join('');
 
   return '<div class="panel"><div class="spread">' +
       '<div><h2>' + esc(a.full_name) + '</h2><p class="muted small">' + esc(a.ref_code) + ' - ' + esc(a.school) + '</p></div>' +
       '<div class="row">' +
         statusBadge(a.status, a.status_label) +
-        '<button class="btn btn-success btn-sm" data-app="' + a.id + '" data-status="approved"' + (decided ? ' disabled' : '') + '>Approve</button>' +
-        '<button class="btn btn-danger btn-sm" data-app="' + a.id + '" data-status="rejected"' + (decided ? ' disabled' : '') + '>Reject</button>' +
+        '<span class="muted small">' + verified + '/' + a.doc_total + ' verified</span>' +
       '</div>' +
-    '</div><div class="table-wrap"><table><thead><tr><th>Document</th><th>File</th><th>Status</th></tr></thead>' +
+    '</div><div class="table-wrap"><table><thead><tr><th>Document</th><th>File</th><th>Status</th><th>Action</th></tr></thead>' +
     '<tbody>' + docs + '</tbody></table></div></div>';
+}
+
+let rejectDocId = null;
+
+function ensureRejectModal() {
+  let m = document.getElementById('rejectModal');
+  if (m) return m;
+
+  m = document.createElement('div');
+  m.id = 'rejectModal';
+  m.className = 'modal-overlay hidden';
+  m.innerHTML =
+    '<div class="modal">' +
+      '<div class="modal-head">' +
+        '<h3>Reject document</h3>' +
+        '<button class="btn btn-outline btn-sm" id="rejectModalClose" type="button">Close</button>' +
+      '</div>' +
+      '<div class="modal-body">' +
+        '<p class="muted small" id="rejectModalDoc"></p>' +
+        '<div class="field">' +
+          '<label for="rejectReason">Reason for rejection</label>' +
+          '<textarea id="rejectReason" rows="3" placeholder="e.g. Missing required signatures."></textarea>' +
+        '</div>' +
+      '</div>' +
+      '<div class="modal-foot">' +
+        '<button class="btn btn-outline btn-sm" id="rejectModalCancel" type="button">Cancel</button>' +
+        '<button class="btn btn-danger btn-sm" id="rejectModalConfirm" type="button">Reject document</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(m);
+
+  m.addEventListener('click', (e) => { if (e.target === m) closeRejectModal(); });
+  document.getElementById('rejectModalClose').addEventListener('click', closeRejectModal);
+  document.getElementById('rejectModalCancel').addEventListener('click', closeRejectModal);
+  document.getElementById('rejectModalConfirm').addEventListener('click', async () => {
+    const btn = document.getElementById('rejectModalConfirm');
+    if (!rejectDocId) return;
+    btn.disabled = true;
+    try {
+      await apiPost('verify.php', {
+        doc_id: rejectDocId,
+        status: 'rejected',
+        note: document.getElementById('rejectReason').value.trim(),
+      });
+      closeRejectModal();
+      note('Document rejected.');
+      load();
+    } catch (err) {
+      note(err.message, 'error');
+      btn.disabled = false;
+    }
+  });
+
+  return m;
+}
+
+function openRejectModal(docId, doc) {
+  rejectDocId = docId;
+  const m = ensureRejectModal();
+  document.getElementById('rejectModalDoc').textContent =
+    (doc ? doc.doc_type + ' \u2014 ' + doc.file_name : 'Document #' + docId);
+  document.getElementById('rejectReason').value = '';
+  document.getElementById('rejectModalConfirm').disabled = false;
+  m.classList.remove('hidden');
+}
+
+function closeRejectModal() {
+  const m = document.getElementById('rejectModal');
+  if (!m) return;
+  m.classList.add('hidden');
+  rejectDocId = null;
 }
 
 async function load() {
   const body = document.getElementById('body');
+  const q = encodeURIComponent((document.getElementById('search') || {}).value || '');
+  const status = (document.getElementById('filter') || {}).value || 'all';
+  const docStatus = (document.getElementById('docFilter') || {}).value || 'pending';
+
   try {
-    const data = await apiGet('applications.php');
-    const queue = data.applications.filter((a) => a.documents.some((d) => d.status !== 'verified'));
-    body.innerHTML = queue.length
-      ? queue.map(card).join('')
-      : '<div class="panel"><h2>Queue is clear</h2><p class="muted small">Every document in this cycle has been verified.</p></div>';
+    const url = 'applications.php?page=' + page + '&per_page=10' +
+      (q ? '&q=' + q : '') + '&status=' + encodeURIComponent(status) + '&doc_status=' + encodeURIComponent(docStatus);
+    const data = await apiGet(url);
+
+    const list = data.applications || [];
+    const cards = list.map(card).join('') ||
+      '<div class="panel"><h2>Queue is clear</h2><p class="muted small">No applications match this view. Try widening the filters.</p></div>';
+
+    const pages = data.pages;
+
+    body.innerHTML =
+      '<div class="panel"><div class="row">' +
+        '<input type="text" id="search" placeholder="Search name, application ID, email or mobile" style="flex:1 1 260px">' +
+        '<select id="filter" style="max-width:200px">' +
+          '<option value="all">All statuses</option><option value="submitted">Submitted</option>' +
+          '<option value="under_verification">Verification</option><option value="ranked">Ranked</option>' +
+          '<option value="approved">Approved</option><option value="waitlisted">Waitlisted</option>' +
+          '<option value="rejected">Rejected</option>' +
+        '</select>' +
+        '<select id="docFilter" style="max-width:230px">' +
+          '<option value="pending">Pending verification</option>' +
+          '<option value="incomplete">Not fully verified</option>' +
+          '<option value="rejected">Has rejected documents</option>' +
+          '<option value="verified">All verified</option>' +
+          '<option value="all">All documents</option>' +
+        '</select></div></div>' +
+      cards +
+      '<div class="row" style="padding:.6rem 0">' +
+        '<span class="muted small">' + data.total + ' result' + (data.total === 1 ? '' : 's') + ' &middot; page ' + page + ' of ' + pages + '</span>' +
+        '<button class="btn btn-outline btn-sm" id="prevBtn" type="button"' + (page > 1 ? '' : ' disabled') + '>Previous</button>' +
+        '<button class="btn btn-outline btn-sm" id="nextBtn" type="button"' + (page < pages ? '' : ' disabled') + '>Next</button>' +
+      '</div>';
+
+    document.getElementById('search').value = decodeURIComponent(q || '');
+    document.getElementById('filter').value = status;
+    document.getElementById('docFilter').value = docStatus;
+
+    const fire = () => {
+      page = 1;
+      load();
+    };
+    let timer = null;
+    document.getElementById('search').addEventListener('input', () => {
+      clearTimeout(timer);
+      timer = setTimeout(fire, 300);
+    });
+    document.getElementById('filter').addEventListener('change', fire);
+    document.getElementById('docFilter').addEventListener('change', fire);
+    document.getElementById('prevBtn').addEventListener('click', () => { page -= 1; load(); });
+    document.getElementById('nextBtn').addEventListener('click', () => { page += 1; load(); });
 
     const docsById = {};
-    queue.forEach((a) => a.documents.forEach((d) => { docsById[d.id] = d; }));
+    list.forEach((a) => a.documents.forEach((d) => { docsById[d.id] = d; }));
 
     body.querySelectorAll('button[data-view]').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -68,17 +194,24 @@ async function load() {
       });
     });
 
-    body.querySelectorAll('button[data-app]').forEach((btn) => {
+    body.querySelectorAll('button[data-verify]').forEach((btn) => {
       btn.addEventListener('click', async () => {
         btn.disabled = true;
         try {
-          await apiPost('decision.php', { app_id: Number(btn.dataset.app), status: btn.dataset.status });
-          note('Decision recorded: ' + btn.dataset.status + '.');
+          await apiPost('verify.php', { doc_id: Number(btn.dataset.verify), status: 'verified' });
+          note('Document verified.');
           load();
         } catch (err) {
           note(err.message, 'error');
           btn.disabled = false;
         }
+      });
+    });
+
+    body.querySelectorAll('button[data-reject]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = Number(btn.dataset.reject);
+        openRejectModal(id, docsById[id]);
       });
     });
   } catch (err) {
